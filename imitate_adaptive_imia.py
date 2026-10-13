@@ -28,6 +28,7 @@ parser.add_argument("--dataset", default="fmnist", type=str)
 parser.add_argument("--pkeep", default=0.5, type=float)
 parser.add_argument("--data_dir", default="/path/to/your/datasets", type=str)
 parser.add_argument("--savedir", default="./", type=str)
+parser.add_argument("--cuda", default=0, type=int) #Adicionado por mim
 # imitation parameters
 parser.add_argument("--temperature", default=1.0, type=float)
 parser.add_argument("--alpha", default=1.0, type=float)
@@ -38,8 +39,14 @@ parser.add_argument("--imitate_acc", default=0.5, type=float)
 
 args = parser.parse_args()
 load_config(args)
-device = torch.device("cuda") if torch.cuda.is_available() else torch.device("mps")
 
+# device = torch.device("cuda") if torch.cuda.is_available() else torch.device("mps")
+# Comentei a linha acima e adicionei a seguinte para permitir a seleção da GPU via argumento
+if torch.cuda.is_available():
+    device = torch.device(f"cuda:{args.cuda}")
+else:
+    device = torch.device("cpu")
+print(f"Using device: {device}")
 
 def train_and_save_imitate(model_type):
     print(f"Training {model_type} model {args.shadow_id} ...")
@@ -60,7 +67,9 @@ def train_and_save_imitate(model_type):
 
     # Load teacher model (target-attacked model)
     teacher_model = load_model(args).to(device)
-    teacher_model.load_state_dict(torch.load(f"{args.dataset}/256/shadow_model.pt"))
+    # teacher_model.load_state_dict(torch.load(f"{args.dataset}/256/shadow_model.pt"))
+    # Comentei a linha acima e adicionei a seguinte
+    teacher_model.load_state_dict(torch.load(f"{args.dataset}/256/shadow_model.pt", map_location=device))
     teacher_model.eval()
 
     # 1. Use half IN/OUT logic for nonpivot selection
@@ -109,7 +118,9 @@ def inference_all(savedir, data_type, model_name):
     data_ds = load_dataset(args, data_type=data_type)
     data_dl = DataLoader(data_ds, batch_size=512, shuffle=False, num_workers=4)
     m = load_model(args)
-    m.load_state_dict(torch.load(os.path.join(savedir, f"{model_name}.pt")))
+    # m.load_state_dict(torch.load(os.path.join(savedir, f"{model_name}.pt")))
+    # Troquei acima para a linha abaixo para permitir o carregamento do modelo no dispositivo correto
+    m.load_state_dict(torch.load(os.path.join(savedir, f"{model_name}.pt"), map_location=device))
     m.to(device)
     m.eval()
     logits_n = []
